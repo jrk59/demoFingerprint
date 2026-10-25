@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Simple Fingerprint</title>
+<style>
+  body  { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+  table { border-collapse: collapse; width: 100%; }
+  td    { border: 1px solid #ccc; padding: 6px 10px; vertical-align: top; }
+  td:first-child { font-weight: bold; white-space: nowrap; }
+  #fingerprint { font: bold 40px monospace; color: #2a5bd7; }
+</style>
+</head>
+<body>
+
+<h1>Your fingerprint</h1>
+<div id="fingerprint"></div>
+<p>Built from the signals below. No cookies, no login, nothing stored.</p>
+
+<table id="results"></table>
+
+<h3>The canvas image we drew (and hashed)</h3>
+<div id="canvasSpot"></div>
+
+<script>
+// ------------------------------------------------------------
+// A tiny hash function: turns any text into a short code.
+// Same text in -> same code out. Change one character -> totally different code.
+// ------------------------------------------------------------
+function hash(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) {
+    h = (h * 33) ^ text.charCodeAt(i);
+  }
+  return (h >>> 0).toString(16);   // as a positive hex number
+}
+
+
+// ------------------------------------------------------------
+// Signal 1: Canvas
+// Draw the same text and shapes on every machine, then read the pixels back.
+// Different fonts, GPUs, and anti-aliasing produce slightly different pixels.
+// ------------------------------------------------------------
+function getCanvasSignal() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 250;
+  canvas.height = 60;
+  const ctx = canvas.getContext("2d");
+
+  ctx.font = "18px Arial";
+  ctx.fillStyle = "#f60";
+  ctx.fillRect(100, 5, 60, 20);
+  ctx.fillStyle = "#069";
+  ctx.fillText("Hello, fingerprint! 😃", 5, 25);
+  ctx.fillStyle = "rgba(0, 200, 0, 0.6)";
+  ctx.fillText("Hello, fingerprint! 😃", 9, 45);
+
+  document.getElementById("canvasSpot").appendChild(canvas);  // show it on the page
+
+  const pixels = canvas.toDataURL();   // the whole image as one long string
+  return hash(pixels);
+}
+
+
+// ------------------------------------------------------------
+// Signal 2: Graphics card (WebGL)
+// The browser will often just tell us which GPU you have.
+// ------------------------------------------------------------
+function getGpuSignal() {
+  const gl = document.createElement("canvas").getContext("webgl");
+  if (!gl) return "WebGL not available";
+
+  const info = gl.getExtension("WEBGL_debug_renderer_info");
+  if (!info) return "hidden by browser";
+
+  return gl.getParameter(info.UNMASKED_RENDERER_WEBGL);
+}
+
+
+// ------------------------------------------------------------
+// Signals 3-5: Things the browser hands over directly
+// ------------------------------------------------------------
+function getScreenSignal() {
+  return screen.width + " x " + screen.height + " @ " + window.devicePixelRatio + "x pixel ratio";
+}
+
+function getHardwareSignal() {
+  return navigator.hardwareConcurrency + " CPU threads, " +
+         (navigator.deviceMemory || "?") + " GB memory (approx.)";
+}
+
+function getLocaleSignal() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone + ", " + navigator.language;
+}
+
+
+// ------------------------------------------------------------
+// Put it all together
+// ------------------------------------------------------------
+const signals = {
+  "Canvas (hashed)": getCanvasSignal(),
+  "Graphics card":   getGpuSignal(),
+  "Screen":          getScreenSignal(),
+  "Hardware":        getHardwareSignal(),
+  "Time zone / language": getLocaleSignal(),
+};
+
+// Show each signal in the table
+const table = document.getElementById("results");
+for (const name in signals) {
+  table.innerHTML += "<tr><td>" + name + "</td><td>" + signals[name] + "</td></tr>";
+}
+
+// Glue every signal into one string, then hash that into the final fingerprint
+const combined = Object.values(signals).join("|");
+document.getElementById("fingerprint").textContent = hash(combined);
+</script>
+
+</body>
+</html>
